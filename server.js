@@ -10,29 +10,24 @@ const server = http.createServer(app);
 // ✅ Socket.io setup
 const io = new Server(server, {
     cors: {
-        origin: "*", // ⚠️ later restrict to your frontend URL
+        origin: "*",
         methods: ["GET", "POST"],
     },
 });
 
-// Store connected users
 const userSocketMap = {};
 
-// Get all clients in a room
 function getAllConnectedClients(roomId) {
     const room = io.sockets.adapter.rooms.get(roomId) || new Set();
-
     return Array.from(room).map((socketId) => ({
         socketId,
         username: userSocketMap[socketId],
     }));
 }
 
-// Socket connection
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
-    // Join room
     socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
         userSocketMap[socket.id] = username;
         socket.join(roomId);
@@ -46,17 +41,14 @@ io.on("connection", (socket) => {
         });
     });
 
-    // Code change
     socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
         socket.to(roomId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    // Sync code
     socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    // Disconnect handling
     socket.on("disconnecting", () => {
         const rooms = [...socket.rooms];
 
@@ -71,24 +63,16 @@ io.on("connection", (socket) => {
     });
 });
 
-// =============================
-// ✅ SERVE FRONTEND (React)
-// =============================
-
-// Path to React build folder
+// ✅ Serve frontend
 const buildPath = path.join(__dirname, "build");
-
-// Serve static files
 app.use(express.static(buildPath));
 
-// ✅ FIXED catch-all route (IMPORTANT)
-app.get("/*", (req, res) => {
+// ✅ ✅ ONLY THIS WORKS in Express 5
+app.get("/:path(*)", (req, res) => {
     res.sendFile(path.join(buildPath, "index.html"));
 });
 
-// =============================
-// ✅ START SERVER
-// =============================
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
