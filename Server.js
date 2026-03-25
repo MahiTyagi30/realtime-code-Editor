@@ -3,20 +3,18 @@ const app = express();
 const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
-const ACTIONS = require("./src/Actions"); // Ensure this path is correct
+const ACTIONS = require("./src/Actions");
 
 const server = http.createServer(app);
 
+// ✅ Socket.io setup with proper CORS
 const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:3000", "http://localhost:5173"],
+        origin: "*", // allow all origins (you can restrict later)
         methods: ["GET", "POST"],
     },
 });
-app.use(express.static('build'));
-app.use((req,res,next)=>{
-res.sendFile(path.join(__dirname,'build','index.html'));
-})
+
 // Store connected users
 const userSocketMap = {};
 
@@ -29,17 +27,17 @@ function getAllConnectedClients(roomId) {
     }));
 }
 
+// Socket connection
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
-    // User joins a room
+    // Join room
     socket.on(ACTIONS.JOIN, ({ roomId, username }) => {
         userSocketMap[socket.id] = username;
         socket.join(roomId);
 
         const clients = getAllConnectedClients(roomId);
 
-        // Emit updated list to everyone in the room
         io.in(roomId).emit(ACTIONS.JOINED, {
             clients,
             username,
@@ -47,19 +45,20 @@ io.on("connection", (socket) => {
         });
     });
 
-    // Code changes broadcast
+    // Code change
     socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
         socket.to(roomId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    // Sync code to a specific socket
+    // Sync code
     socket.on(ACTIONS.SYNC_CODE, ({ socketId, code }) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    // Handle disconnect
+    // Disconnect
     socket.on("disconnecting", () => {
         const rooms = [...socket.rooms];
+
         rooms.forEach((roomId) => {
             socket.to(roomId).emit(ACTIONS.DISCONNECTED, {
                 socketId: socket.id,
@@ -71,17 +70,18 @@ io.on("connection", (socket) => {
     });
 });
 
-// Serve React build
+// ✅ Serve React build (IMPORTANT)
 const buildPath = path.join(__dirname, "build");
 app.use(express.static(buildPath));
 
-// Catch-all route for React (works safely with Node 25+)
-app.use((req, res) => {
+// Catch-all route for React
+app.get("*", (req, res) => {
     res.sendFile(path.join(buildPath, "index.html"));
 });
 
-// Start server
+// ✅ Start server (Render uses process.env.PORT)
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
