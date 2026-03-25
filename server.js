@@ -7,10 +7,10 @@ const ACTIONS = require("./src/Actions");
 
 const server = http.createServer(app);
 
-// ✅ Socket.io setup with proper CORS
+// ✅ Socket.io setup
 const io = new Server(server, {
     cors: {
-        origin: "*", // allow all origins (you can restrict later)
+        origin: "*", // ⚠️ later restrict to your frontend URL
         methods: ["GET", "POST"],
     },
 });
@@ -18,9 +18,10 @@ const io = new Server(server, {
 // Store connected users
 const userSocketMap = {};
 
-// Helper: get all clients in a room
+// Get all clients in a room
 function getAllConnectedClients(roomId) {
     const room = io.sockets.adapter.rooms.get(roomId) || new Set();
+
     return Array.from(room).map((socketId) => ({
         socketId,
         username: userSocketMap[socketId],
@@ -55,7 +56,7 @@ io.on("connection", (socket) => {
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, { code });
     });
 
-    // Disconnect
+    // Disconnect handling
     socket.on("disconnecting", () => {
         const rooms = [...socket.rooms];
 
@@ -70,18 +71,26 @@ io.on("connection", (socket) => {
     });
 });
 
-// ✅ Serve React build (IMPORTANT)
+// =============================
+// ✅ SERVE FRONTEND (React)
+// =============================
+
+// Path to React build folder
 const buildPath = path.join(__dirname, "build");
+
+// Serve static files
 app.use(express.static(buildPath));
 
-// Catch-all route for React
-app.get("*", (req, res) => {
+// ✅ FIXED catch-all route (IMPORTANT)
+app.get("/*", (req, res) => {
     res.sendFile(path.join(buildPath, "index.html"));
 });
 
-// ✅ Start server (Render uses process.env.PORT)
+// =============================
+// ✅ START SERVER
+// =============================
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
