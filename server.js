@@ -10,13 +10,15 @@ const server = http.createServer(app);
 // ✅ Socket.io setup
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: "*", // later replace with frontend URL
         methods: ["GET", "POST"],
     },
 });
 
+// Store connected users
 const userSocketMap = {};
 
+// Get all clients in a room
 function getAllConnectedClients(roomId) {
     const room = io.sockets.adapter.rooms.get(roomId) || new Set();
     return Array.from(room).map((socketId) => ({
@@ -25,6 +27,7 @@ function getAllConnectedClients(roomId) {
     }));
 }
 
+// Socket connection
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
@@ -63,16 +66,24 @@ io.on("connection", (socket) => {
     });
 });
 
-// ✅ Serve frontend
+// =============================
+// ✅ SERVE FRONTEND (React)
+// =============================
+
 const buildPath = path.join(__dirname, "build");
+
+// Serve static files
 app.use(express.static(buildPath));
 
-// ✅ ✅ ONLY THIS WORKS in Express 5
-app.get("/:path(*)", (req, res) => {
+// ✅ FINAL FIX (NO WILDCARD ROUTES)
+app.use((req, res) => {
     res.sendFile(path.join(buildPath, "index.html"));
 });
 
-// ✅ Start server
+// =============================
+// ✅ START SERVER
+// =============================
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
